@@ -1,3 +1,5 @@
+#include "gmock/gmock.h"
+
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -82,7 +84,7 @@ void input2(string w, string wk) {
 	points[id2] += add_point;
 }
 
-void input() {
+void runAttendanceManager() {
 	ifstream fin{ "attendance_weekday_500.txt" }; //500개 데이터 입력
 	for (int i = 0; i < 500; i++) {
 		string t1, t2;
@@ -136,5 +138,12 @@ void input() {
 }
 
 int main() {
-	input();
+#if defined(_DEBUG)
+	::testing::InitGoogleMock();
+	return RUN_ALL_TESTS();
+#else
+	runAttendanceManager();
+
+	return 0;
+#endif
 }
