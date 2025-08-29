@@ -1,18 +1,16 @@
 #include "gmock/gmock.h"
 
 #include <iostream>
-#include <fstream>
 #include <string>
 #include <vector>
 #include <map>
 #include <algorithm>
 
+#include "attendance_file_reader.h"
+
 using namespace std;
 
-struct Node {
-	string w;
-	string wk;
-};
+const static string ATTENDANCE_LIST_FILE_PATH = "attendance_weekday_500.txt";
 
 map<string, int> id1;
 int id_cnt = 0;
@@ -26,7 +24,7 @@ string names[100];
 int wed[100];
 int weeken[100];
 
-void input2(string w, string wk) {
+void calAttendanceScore(string w, string wk) {
 	//ID 부여
 	if (id1.count(w) == 0) {
 		id1.insert({ w, ++id_cnt });
@@ -85,11 +83,10 @@ void input2(string w, string wk) {
 }
 
 void runAttendanceManager() {
-	ifstream fin{ "attendance_weekday_500.txt" }; //500개 데이터 입력
-	for (int i = 0; i < 500; i++) {
-		string t1, t2;
-		fin >> t1 >> t2;
-		input2(t1, t2);
+	auto attendanceList = readAttendanceListFromFile(ATTENDANCE_LIST_FILE_PATH);
+
+	for (auto& attendance : attendanceList) {
+		calAttendanceScore(attendance.name, attendance.weekday);
 	}
 
 	for (int i = 1; i <= id_cnt; i++) {
