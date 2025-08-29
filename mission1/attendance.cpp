@@ -6,132 +6,159 @@
 #include <map>
 #include <algorithm>
 
+#include "attendees_data.h"
 #include "attendance_file_reader.h"
+
+#include "constants.h"
 
 using namespace std;
 
-const static string ATTENDANCE_LIST_FILE_PATH = "attendance_weekday_500.txt";
+map<string, int> idFromName;
+map<int, Attendees> attendeesInfo;
 
-map<string, int> id1;
 int id_cnt = 0;
 
-//dat[사용자ID][요일]
-int dat[100][100];
-int points[100];
-int grade[100];
-string names[100];
+int getWeekDayIdxFromString(string weekday) {
+	for (int weekday_idx = 0; weekday_idx < NUM_WEEKDAY; ++weekday_idx) {
+		if (weekday == WEEKDAY_STRING[weekday_idx]) {
+			return weekday_idx;
+		}
+	}
 
-int wed[100];
-int weeken[100];
+	return -1;
+}
 
-void calAttendanceScore(string w, string wk) {
-	//ID 부여
-	if (id1.count(w) == 0) {
-		id1.insert({ w, ++id_cnt });
+bool isExistAttendees(string name) {
+	return (idFromName.count(name) != 0);
+}
 
-		if (w == "Daisy") {
-			int debug = 1;
+void checkAndAddAttendeesInfo(string name, string weekday) {
+	if (isExistAttendees(name) == false) {
+		int id = ++id_cnt;
+		idFromName.insert({ name, id });
+		attendeesInfo.insert({ id, Attendees {id, name} });
+	}
+}
+
+void addAttendanceWeekday(string name, string weekday) {
+	int weekday_idx = getWeekDayIdxFromString(weekday);
+
+	if (weekday_idx == -1) {
+		return;
+	}
+
+	auto& attendees = attendeesInfo[idFromName[name]];
+
+	attendees.attendEachWeekDay[weekday_idx] += 1;
+}
+
+void makeAllAttendeesInfo(const vector<Attendance>& attendanceList) {
+	for (auto& attendance : attendanceList) {
+		checkAndAddAttendeesInfo(attendance.name, attendance.weekday);
+		addAttendanceWeekday(attendance.name, attendance.weekday);
+	}
+}
+
+void calWeekDayScore(Attendees& attendees) {
+	for (int i = 0; i < NUM_WEEKDAY; ++i) {
+		attendees.point += (attendees.attendEachWeekDay[i] * SCORE_WEEKDAY[i]);
+	}
+}
+
+bool checkWednesDayAttendanceMore10(const Attendees& attendees) {
+	return (attendees.attendEachWeekDay[WEDNESDAY] >= 10);
+}
+bool checkWeekendAttendanceMore10(const Attendees& attendees) {
+	int numAttendanceWeekend = attendees.attendEachWeekDay[SATURDAY] + attendees.attendEachWeekDay[SUNDAY];
+	return (numAttendanceWeekend >= 10);
+}
+
+void calAttendanceScore() {
+	for (int id = 1; id <= id_cnt; ++id) {
+		auto& attendees = attendeesInfo[id];
+
+		calWeekDayScore(attendees);
+
+		if (checkWednesDayAttendanceMore10(attendees)) {
+			attendees.point += BONUS_SCORE_MORE_THAN_10_ATTANDANCE;
 		}
 
-		names[id_cnt] = w;
+		if (checkWeekendAttendanceMore10(attendees)) {
+			attendees.point += BONUS_SCORE_MORE_THAN_10_ATTANDANCE;
+		}
 	}
-	int id2 = id1[w];
+}
 
-	//디버깅용
-	if (w == "Daisy") {
-		int debug = 1;
+GRADE getGrade(int point) {
+	if (point >= GRADE_MINIMUM_SCORE[GOLD]) {
+		return GOLD;
 	}
-
-
-	int add_point = 0;
-	int index = 0;
-	if (wk == "monday") {
-		index = 0;
-		add_point++;
-	}
-	if (wk == "tuesday") {
-		index = 1;
-		add_point++;
-	}
-	if (wk == "wednesday") {
-		index = 2;
-		add_point += 3;
-		wed[id2] += 1;
-	}
-	if (wk == "thursday") {
-		index = 3;
-		add_point++;
-	}
-	if (wk == "friday") {
-		index = 4;
-		add_point++;
-	}
-	if (wk == "saturday") {
-		index = 5;
-		add_point += 2;
-		weeken[id2] += 1;
-	}
-	if (wk == "sunday") {
-		index = 6;
-		add_point += 2;
-		weeken[id2] += 1;
+	else if (point >= GRADE_MINIMUM_SCORE[SILVER]) {
+		return SILVER;
 	}
 
-	//사용자ID별 요일 데이터에 1씩 증가
-	dat[id2][index] += 1;
-	points[id2] += add_point;
+	return NORMAL;
+}
+
+void makeGradeAllAttendees() {
+	for (int id = 1; id <= id_cnt; ++id) {
+		auto& attendees = attendeesInfo[id];
+
+		attendees.grade = getGrade(attendees.point);
+	}
+}
+
+void printAttendeesInfo(const Attendees& attendees) {
+	cout << "NAME : " << attendees.name << ", ";
+	cout << "POINT : " << attendees.point << ", ";
+	cout << "GRADE : " << GRADE_STRING[attendees.grade] << "\n";
+}
+
+bool isRemovePlayer(const Attendees& attendees) {
+	if (attendees.grade == NORMAL
+		&& attendees.attendEachWeekDay[WEDNESDAY] == 0
+		&& attendees.attendEachWeekDay[SATURDAY] == 0
+		&& attendees.attendEachWeekDay[SUNDAY] == 0){
+		return true;
+	}
+
+	return false;
+}
+
+void printRemovePlayer() {
+	std::cout << "\n";
+	std::cout << "Removed player\n";
+	std::cout << "==============\n";
+	for (int i = 1; i <= id_cnt; i++) {
+		auto& attendees = attendeesInfo[i];
+
+		if (isRemovePlayer(attendees)){
+			std::cout << attendees.name << "\n";
+
+		}
+	}
+}
+
+void printAllAttendeesInfo() {
+	for (int id = 1; id <= id_cnt; ++id) {
+		auto& attendees = attendeesInfo[id];
+
+		printAttendeesInfo(attendees);
+	}
+
+	printRemovePlayer();
 }
 
 void runAttendanceManager() {
 	auto attendanceList = readAttendanceListFromFile(ATTENDANCE_LIST_FILE_PATH);
 
-	for (auto& attendance : attendanceList) {
-		calAttendanceScore(attendance.name, attendance.weekday);
-	}
+	attendeesInfo.clear();
+	makeAllAttendeesInfo(attendanceList);
 
-	for (int i = 1; i <= id_cnt; i++) {
-		if (dat[i][2] > 9) {
-			points[i] += 10;
-		}
+	calAttendanceScore();
+	makeGradeAllAttendees();
 
-		if (dat[i][5] + dat[i][6] > 9) {
-			points[i] += 10;
-		}
-
-		if (points[i] >= 50) {
-			grade[i] = 1;
-		}
-		else if (points[i] >= 30) {
-			grade[i] = 2;
-		}
-		else {
-			grade[i] = 0;
-		}
-
-		cout << "NAME : " << names[i] << ", ";
-		cout << "POINT : " << points[i] << ", ";
-		cout << "GRADE : ";
-
-		if (grade[i] == 1) {
-			cout << "GOLD" << "\n";
-		}
-		else if (grade[i] == 2) {
-			cout << "SILVER" << "\n";
-		}
-		else {
-			cout << "NORMAL" << "\n";
-		}
-	}
-
-	std::cout << "\n";
-	std::cout << "Removed player\n";
-	std::cout << "==============\n";
-	for (int i = 1; i <= id_cnt; i++) {
-
-		if (grade[i] != 1 && grade[i] != 2 && wed[i] == 0 && weeken[i] == 0) {
-			std::cout << names[i] << "\n";
-		}
-	}
+	printAllAttendeesInfo();
 }
 
 int main() {
